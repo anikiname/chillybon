@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixel Adventure</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #17152d;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+
+    .game {
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #c5a3ff;
+    }
+
+    canvas {
+      width: min(800px, 90vw);
+      height: auto;
+      border: 3px solid #9b7bff;
+      border-radius: 12px;
+      background: #292451;
+      image-rendering: pixelated;
+    }
+
+    p {
+      color: #d6d0ff;
+    }
+
+    button {
+      padding: 10px 18px;
+      margin: 5px;
+      border: 0;
+      border-radius: 8px;
+      background: #9b7bff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <h1>✨ Pixel Adventure</h1>
+    <p>Монеты: <span id="score">0</span></p>
+    <canvas id="game" width="800" height="400"></canvas>
+    <p>Управление: ← → или A D · Прыжок: пробел</p>
+    <button onclick="restart()">Начать заново</button>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const scoreText = document.getElementById("score");
+
+    let player, coins, score, keys, gameOver;
+
+    function restart() {
+      player = {
+        x: 50, y: 300, w: 28, h: 36,
+        vx: 0, vy: 0, grounded: false
+      };
+
+      coins = [
+        { x: 200, y: 300, taken: false },
+        { x: 350, y: 250, taken: false },
+        { x: 520, y: 300, taken: false },
+        { x: 680, y: 220, taken: false }
+      ];
+
+      score = 0;
+      keys = {};
+      gameOver = false;
+      scoreText.textContent = score;
+    }
+
+    document.addEventListener("keydown", e => {
+      keys[e.key.toLowerCase()] = true;
+      if ([" ", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+      }
+      if (e.key === " " && player.grounded && !gameOver) {
+        player.vy = -12;
+        player.grounded = false;
+      }
+    });
+
+    document.addEventListener("keyup", e => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    function update() {
+      if (gameOver) return;
+
+      player.vx = 0;
+      if (keys.arrowleft || keys.a) player.vx = -4;
+      if (keys.arrowright || keys.d) player.vx = 4;
+
+      player.x += player.vx;
+      player.vy += 0.55;
+      player.y += player.vy;
+      player.grounded = false;
+
+      // Земля
+      if (player.y + player.h >= 350) {
+        player.y = 350 - player.h;
+        player.vy = 0;
+        player.grounded = true;
+      }
+
+      // Платформы
+      for (const p of [
+        { x: 150, y: 310, w: 120, h: 14 },
+        { x: 310, y: 260, w: 120, h: 14 },
+        { x: 480, y: 310, w: 120, h: 14 },
+        { x: 620, y: 230, w: 120, h: 14 }
+      ]) {
+        if (
+          player.vy >= 0 &&
+          player.x + player.w > p.x &&
+          player.x < p.x + p.w &&
+          player.y + player.h >= p.y &&
+          player.y + player.h - player.vy <= p.y
+        ) {
+          player.y = p.y - player.h;
+          player.vy = 0;
+          player.grounded = true;
+        }
+      }
+
+      player.x = Math.max(0, Math.min(800 - player.w, player.x));
+
+      // Сбор монет
+      for (const c of coins) {
+        if (
+          !c.taken &&
+          player.x < c.x + 12 &&
+          player.x + player.w > c.x - 12 &&
+          player.y < c.y + 12 &&
+          player.y + player.h > c.y - 12
+        ) {
+          c.taken = true;
+          score++;
+          scoreText.textContent = score;
+        }
+      }
+
+      if (coins.every(c => c.taken)) gameOver = true;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, 800, 400);
+
+      // Звёзды на фоне
+      ctx.fillStyle = "#ffffff";
+      for (const [x, y] of [
+        [80, 50], [190, 90], [330, 45],
+        [470, 80], [600, 40], [730, 100]
+      ]) {
+        ctx.fillRect(x, y, 3, 3);
+      }
+
+      // Земля
+      ctx.fillStyle = "#4dd4a7";
+      ctx.fillRect(0, 350, 800, 50);
+
+      // Платформы
+      ctx.fillStyle = "#7765c9";
+      for (const p of [
+        { x: 150, y: 310, w: 120, h: 14 },
+        { x: 310, y: 260, w: 120, h: 14 },
+        { x: 480, y: 310, w: 120, h: 14 },
+        { x: 620, y: 230, w: 120, h: 14 }
+      ]) {
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+      }
+
+      // Монеты
+      for (const c of coins) {
+        if (c.taken) continue;
+        ctx.fillStyle = "#ffd166";
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Персонаж
+      ctx.fillStyle = "#ff79b0";
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(player.x + 6, player.y + 8, 5, 5);
+      ctx.fillRect(player.x + 18, player.y + 8, 5, 5);
+
+      if (gameOver) {
+        ctx.fillStyle = "#17152d";
+        ctx.fillRect(180, 145, 440, 90);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "28px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Уровень пройден! 🎉", 400, 185);
+        ctx.font = "18px Arial";
+        ctx.fillText("Нажми «Начать заново»", 400, 215);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    restart();
+    loop();
+  </script>
+</body>
+</html>
